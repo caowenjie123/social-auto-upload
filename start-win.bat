@@ -1,6 +1,9 @@
 @echo off
 TITLE One-Click Starter for social-auto-upload
 
+REM Change to the directory where this batch file is located
+cd /d "%~dp0"
+
 ECHO ==================================================
 ECHO  Starting social-auto-upload Servers...
 ECHO ==================================================

@@ -7,7 +7,7 @@ import os
 import time
 import asyncio
 
-from conf import LOCAL_CHROME_PATH, LOCAL_CHROME_HEADLESS
+from conf import LOCAL_CHROME_PATH, LOCAL_CHROME_HEADLESS, TYPING_DELAY, MANUAL_PUBLISH, KEEP_BROWSER_OPEN
 from utils.base_social_media import set_init_script
 from utils.log import baijiahao_logger
 from utils.network import async_retry
@@ -152,6 +152,7 @@ class BaiJiaHaoVideo(object):
         # 这里为了避免页面变化，故使用相对位置定位：作品标题父级右侧第一个元素的input子元素
         await asyncio.sleep(1)
         baijiahao_logger.info("正在填充标题和话题...")
+        await asyncio.sleep(TYPING_DELAY)  # 填写前等待
         await self.add_title_tags(page)
 
         upload_status = await self.uploading_video(page)
@@ -180,6 +181,15 @@ class BaiJiaHaoVideo(object):
         await context.storage_state(path=self.account_file)  # 保存cookie
         baijiahao_logger.info('cookie更新完毕！')
         await asyncio.sleep(2)  # 这里延迟是为了方便眼睛直观的观看
+        
+        # 是否保持浏览器打开
+        if KEEP_BROWSER_OPEN:
+            baijiahao_logger.info('\n' + '='*50)
+            baijiahao_logger.info('【浏览器保持打开】你可以在浏览器中手动修改内容')
+            baijiahao_logger.info('完成后在终端按回车键关闭浏览器...')
+            baijiahao_logger.info('='*50)
+            await asyncio.get_event_loop().run_in_executor(None, input, '')
+        
         # 关闭浏览器上下文和浏览器实例
         await context.close()
         await browser.close()
@@ -222,6 +232,13 @@ class BaiJiaHaoVideo(object):
 
     @async_retry(timeout=300)  # 例如，最多重试3次，超时时间为180秒
     async def publish_video(self, page: Page, publish_date):
+        if MANUAL_PUBLISH:
+            baijiahao_logger.info('\n' + '='*50)
+            baijiahao_logger.info('【等待确认】请检查内容是否正确，然后在终端按回车键确认发布...')
+            baijiahao_logger.info('='*50)
+            await asyncio.get_event_loop().run_in_executor(None, input, '')
+            baijiahao_logger.info('用户已确认，正在发布...')
+        
         if publish_date != 0:
             # 定时发布
             await self.set_schedule_publish(page, publish_date)
@@ -243,6 +260,7 @@ class BaiJiaHaoVideo(object):
         if len(self.title) <= 8:
             self.title += " 你不知道的"
         await title_container.fill(self.title[:30])
+        await asyncio.sleep(TYPING_DELAY)  # 填写标题后等待
 
     async def main(self):
         async with async_playwright() as playwright:

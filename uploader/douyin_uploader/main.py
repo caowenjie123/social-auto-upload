@@ -5,7 +5,7 @@ from playwright.async_api import Playwright, async_playwright, Page
 import os
 import asyncio
 
-from conf import LOCAL_CHROME_PATH, LOCAL_CHROME_HEADLESS
+from conf import LOCAL_CHROME_PATH, LOCAL_CHROME_HEADLESS, TYPING_DELAY, MANUAL_PUBLISH, KEEP_BROWSER_OPEN
 from utils.base_social_media import set_init_script
 from utils.log import douyin_logger
 
@@ -143,21 +143,26 @@ class DouYinVideo(object):
         # 这里为了避免页面变化，故使用相对位置定位：作品标题父级右侧第一个元素的input子元素
         await asyncio.sleep(1)
         douyin_logger.info(f'  [-] 正在填充标题和话题...')
+        await asyncio.sleep(TYPING_DELAY)  # 填写前等待
         title_container = page.get_by_text('作品标题').locator("..").locator("xpath=following-sibling::div[1]").locator("input")
         if await title_container.count():
             await title_container.fill(self.title[:30])
+            await asyncio.sleep(TYPING_DELAY)  # 填写标题后等待
         else:
             titlecontainer = page.locator(".notranslate")
             await titlecontainer.click()
             await page.keyboard.press("Backspace")
             await page.keyboard.press("Control+KeyA")
             await page.keyboard.press("Delete")
+            await asyncio.sleep(TYPING_DELAY)  # 清空后等待
             await page.keyboard.type(self.title)
+            await asyncio.sleep(TYPING_DELAY)  # 输入标题后等待
             await page.keyboard.press("Enter")
         css_selector = ".zone-container"
         for index, tag in enumerate(self.tags, start=1):
             await page.type(css_selector, "#" + tag)
             await page.press(css_selector, "Space")
+            await asyncio.sleep(TYPING_DELAY)  # 每个话题后等待
         douyin_logger.info(f'总共添加{len(self.tags)}个话题')
         while True:
             # 判断重新上传按钮是否存在，如果不存在，代表视频正在上传，则等待
@@ -202,6 +207,13 @@ class DouYinVideo(object):
             await self.set_schedule_time_douyin(page, self.publish_date)
 
         # 判断视频是否发布成功
+        if MANUAL_PUBLISH:
+            douyin_logger.info('\n' + '='*50)
+            douyin_logger.info('【等待确认】请检查内容是否正确，然后在终端按回车键确认发布...')
+            douyin_logger.info('='*50)
+            await asyncio.get_event_loop().run_in_executor(None, input, '')
+            douyin_logger.info('用户已确认，正在发布...')
+        
         while True:
             # 判断视频是否发布成功
             try:
@@ -222,6 +234,15 @@ class DouYinVideo(object):
         await context.storage_state(path=self.account_file)  # 保存cookie
         douyin_logger.success('  [-]cookie更新完毕！')
         await asyncio.sleep(2)  # 这里延迟是为了方便眼睛直观的观看
+        
+        # 是否保持浏览器打开
+        if KEEP_BROWSER_OPEN:
+            douyin_logger.info('\n' + '='*50)
+            douyin_logger.info('【浏览器保持打开】你可以在浏览器中手动修改内容')
+            douyin_logger.info('完成后在终端按回车键关闭浏览器...')
+            douyin_logger.info('='*50)
+            await asyncio.get_event_loop().run_in_executor(None, input, '')
+        
         # 关闭浏览器上下文和浏览器实例
         await context.close()
         await browser.close()

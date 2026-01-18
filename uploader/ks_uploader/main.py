@@ -5,7 +5,7 @@ from playwright.async_api import Playwright, async_playwright
 import os
 import asyncio
 
-from conf import LOCAL_CHROME_PATH, LOCAL_CHROME_HEADLESS
+from conf import LOCAL_CHROME_PATH, LOCAL_CHROME_HEADLESS, TYPING_DELAY, MANUAL_PUBLISH, KEEP_BROWSER_OPEN
 from utils.base_social_media import set_init_script
 from utils.files_times import get_absolute_path
 from utils.log import kuaishou_logger
@@ -120,20 +120,23 @@ class KSVideo(object):
             await new_feature_button.click()
 
         kuaishou_logger.info("正在填充标题和话题...")
+        await asyncio.sleep(TYPING_DELAY)  # 填写前等待
         await page.get_by_text("描述").locator("xpath=following-sibling::div").click()
         kuaishou_logger.info("clear existing title")
         await page.keyboard.press("Backspace")
         await page.keyboard.press("Control+KeyA")
         await page.keyboard.press("Delete")
+        await asyncio.sleep(TYPING_DELAY)  # 清空后等待
         kuaishou_logger.info("filling new  title")
         await page.keyboard.type(self.title)
+        await asyncio.sleep(TYPING_DELAY)  # 输入标题后等待
         await page.keyboard.press("Enter")
 
         # 快手只能添加3个话题
         for index, tag in enumerate(self.tags[:3], start=1):
             kuaishou_logger.info("正在添加第%s个话题" % index)
             await page.keyboard.type(f"#{tag} ")
-            await asyncio.sleep(2)
+            await asyncio.sleep(TYPING_DELAY)  # 每个话题后等待
 
         max_retries = 60  # 设置最大重试次数,最大等待时间为 2 分钟
         retry_count = 0
@@ -163,6 +166,13 @@ class KSVideo(object):
             await self.set_schedule_time(page, self.publish_date)
 
         # 判断视频是否发布成功
+        if MANUAL_PUBLISH:
+            kuaishou_logger.info('\n' + '='*50)
+            kuaishou_logger.info('【等待确认】请检查内容是否正确，然后在终端按回车键确认发布...')
+            kuaishou_logger.info('='*50)
+            await asyncio.get_event_loop().run_in_executor(None, input, '')
+            kuaishou_logger.info('用户已确认，正在发布...')
+        
         while True:
             try:
                 publish_button = page.get_by_text("发布", exact=True)
@@ -189,6 +199,15 @@ class KSVideo(object):
         await context.storage_state(path=self.account_file)  # 保存cookie
         kuaishou_logger.info('cookie更新完毕！')
         await asyncio.sleep(2)  # 这里延迟是为了方便眼睛直观的观看
+        
+        # 是否保持浏览器打开
+        if KEEP_BROWSER_OPEN:
+            kuaishou_logger.info('\n' + '='*50)
+            kuaishou_logger.info('【浏览器保持打开】你可以在浏览器中手动修改内容')
+            kuaishou_logger.info('完成后在终端按回车键关闭浏览器...')
+            kuaishou_logger.info('='*50)
+            await asyncio.get_event_loop().run_in_executor(None, input, '')
+        
         # 关闭浏览器上下文和浏览器实例
         await context.close()
         await browser.close()

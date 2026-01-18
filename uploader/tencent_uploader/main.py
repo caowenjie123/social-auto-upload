@@ -5,7 +5,7 @@ from playwright.async_api import Playwright, async_playwright
 import os
 import asyncio
 
-from conf import LOCAL_CHROME_PATH, LOCAL_CHROME_HEADLESS
+from conf import LOCAL_CHROME_PATH, LOCAL_CHROME_HEADLESS, TYPING_DELAY, MANUAL_PUBLISH, KEEP_BROWSER_OPEN
 from utils.base_social_media import set_init_script
 from utils.files_times import get_absolute_path
 from utils.log import tencent_logger
@@ -172,6 +172,15 @@ class TencentVideo(object):
         await context.storage_state(path=f"{self.account_file}")  # 保存cookie
         tencent_logger.success('  [-]cookie更新完毕！')
         await asyncio.sleep(2)  # 这里延迟是为了方便眼睛直观的观看
+        
+        # 是否保持浏览器打开
+        if KEEP_BROWSER_OPEN:
+            tencent_logger.info('\n' + '='*50)
+            tencent_logger.info('【浏览器保持打开】你可以在浏览器中手动修改内容')
+            tencent_logger.info('完成后在终端按回车键关闭浏览器...')
+            tencent_logger.info('='*50)
+            await asyncio.get_event_loop().run_in_executor(None, input, '')
+        
         # 关闭浏览器上下文和浏览器实例
         await context.close()
         await browser.close()
@@ -185,6 +194,13 @@ class TencentVideo(object):
             await short_title_element.fill(short_title)
 
     async def click_publish(self, page):
+        if MANUAL_PUBLISH:
+            tencent_logger.info('\n' + '='*50)
+            tencent_logger.info('【等待确认】请检查内容是否正确，然后在终端按回车键确认发布...')
+            tencent_logger.info('='*50)
+            await asyncio.get_event_loop().run_in_executor(None, input, '')
+            tencent_logger.info('用户已确认，正在发布...')
+        
         while True:
             try:
                 if self.is_draft:
@@ -241,12 +257,15 @@ class TencentVideo(object):
                 await asyncio.sleep(2)
 
     async def add_title_tags(self, page):
+        await asyncio.sleep(TYPING_DELAY)  # 填写前等待
         await page.locator("div.input-editor").click()
         await page.keyboard.type(self.title)
+        await asyncio.sleep(TYPING_DELAY)  # 输入标题后等待
         await page.keyboard.press("Enter")
         for index, tag in enumerate(self.tags, start=1):
             await page.keyboard.type("#" + tag)
             await page.keyboard.press("Space")
+            await asyncio.sleep(TYPING_DELAY)  # 每个话题后等待
         tencent_logger.info(f"成功添加hashtag: {len(self.tags)}")
 
     async def add_collection(self, page):

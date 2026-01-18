@@ -16,6 +16,9 @@ from myUtils.postVideo import post_video_tencent, post_video_DouYin, post_video_
 active_queues = {}
 app = Flask(__name__)
 
+VIDEO_DIR = Path(BASE_DIR / "videoFile")
+VIDEO_DIR.mkdir(parents=True, exist_ok=True)
+
 #允许所有来源跨域访问
 CORS(app)
 
@@ -63,7 +66,7 @@ def upload_file():
         # 保存文件到指定位置
         uuid_v1 = uuid.uuid1()
         print(f"UUID v1: {uuid_v1}")
-        filepath = Path(BASE_DIR / "videoFile" / f"{uuid_v1}_{file.filename}")
+        filepath = VIDEO_DIR / f"{uuid_v1}_{file.filename}"
         file.save(filepath)
         return jsonify({"code":200,"msg": "File uploaded successfully", "data": f"{uuid_v1}_{file.filename}"}), 200
     except Exception as e:
@@ -82,7 +85,7 @@ def get_file():
         return {"error": "Invalid filename"}, 400
 
     # 拼接完整路径
-    file_path = str(Path(BASE_DIR / "videoFile"))
+    file_path = str(VIDEO_DIR)
 
     # 返回文件
     return send_from_directory(file_path,filename)
@@ -119,7 +122,7 @@ def upload_save():
 
         # 构造文件名和路径
         final_filename = f"{uuid_v1}_{filename}"
-        filepath = Path(BASE_DIR / "videoFile" / f"{uuid_v1}_{filename}")
+        filepath = VIDEO_DIR / f"{uuid_v1}_{filename}"
 
         # 保存文件
         file.save(filepath)
@@ -283,7 +286,7 @@ def delete_file():
             record = dict(record)
 
             # 获取文件路径并删除实际文件
-            file_path = Path(BASE_DIR / "videoFile" / record['file_path'])
+            file_path = VIDEO_DIR / record['file_path']
             if file_path.exists():
                 try:
                     file_path.unlink()  # 删除文件

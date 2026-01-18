@@ -5,7 +5,7 @@ from playwright.async_api import Playwright, async_playwright, Page
 import os
 import asyncio
 
-from conf import LOCAL_CHROME_PATH, LOCAL_CHROME_HEADLESS
+from conf import LOCAL_CHROME_PATH, LOCAL_CHROME_HEADLESS, TYPING_DELAY, MANUAL_PUBLISH, KEEP_BROWSER_OPEN
 from utils.base_social_media import set_init_script
 from utils.log import xiaohongshu_logger
 
@@ -164,21 +164,26 @@ class XiaoHongShuVideo(object):
         # 这里为了避免页面变化，故使用相对位置定位：作品标题父级右侧第一个元素的input子元素
         await asyncio.sleep(1)
         xiaohongshu_logger.info(f'  [-] 正在填充标题和话题...')
+        await asyncio.sleep(TYPING_DELAY)  # 填写前等待
         title_container = page.locator('div.plugin.title-container').locator('input.d-text')
         if await title_container.count():
             await title_container.fill(self.title[:30])
+            await asyncio.sleep(TYPING_DELAY)  # 填写标题后等待
         else:
             titlecontainer = page.locator(".notranslate")
             await titlecontainer.click()
             await page.keyboard.press("Backspace")
             await page.keyboard.press("Control+KeyA")
             await page.keyboard.press("Delete")
+            await asyncio.sleep(TYPING_DELAY)  # 清空后等待
             await page.keyboard.type(self.title)
+            await asyncio.sleep(TYPING_DELAY)  # 输入标题后等待
             await page.keyboard.press("Enter")
         css_selector = ".ql-editor" # 不能加上 .ql-blank 属性，这样只能获取第一次非空状态
         for index, tag in enumerate(self.tags, start=1):
             await page.type(css_selector, "#" + tag)
             await page.press(css_selector, "Space")
+            await asyncio.sleep(TYPING_DELAY)  # 每个话题后等待
         xiaohongshu_logger.info(f'总共添加{len(self.tags)}个话题')
 
         # while True:
@@ -218,6 +223,13 @@ class XiaoHongShuVideo(object):
             await self.set_schedule_time_xiaohongshu(page, self.publish_date)
 
         # 判断视频是否发布成功
+        if MANUAL_PUBLISH:
+            xiaohongshu_logger.info('\n' + '='*50)
+            xiaohongshu_logger.info('【等待确认】请检查内容是否正确，然后在终端按回车键确认发布...')
+            xiaohongshu_logger.info('='*50)
+            await asyncio.get_event_loop().run_in_executor(None, input, '')
+            xiaohongshu_logger.info('用户已确认，正在发布...')
+        
         while True:
             try:
                 # 等待包含"定时发布"文本的button元素出现并点击
@@ -239,6 +251,15 @@ class XiaoHongShuVideo(object):
         await context.storage_state(path=self.account_file)  # 保存cookie
         xiaohongshu_logger.success('  [-]cookie更新完毕！')
         await asyncio.sleep(2)  # 这里延迟是为了方便眼睛直观的观看
+        
+        # 是否保持浏览器打开
+        if KEEP_BROWSER_OPEN:
+            xiaohongshu_logger.info('\n' + '='*50)
+            xiaohongshu_logger.info('【浏览器保持打开】你可以在浏览器中手动修改内容')
+            xiaohongshu_logger.info('完成后在终端按回车键关闭浏览器...')
+            xiaohongshu_logger.info('='*50)
+            await asyncio.get_event_loop().run_in_executor(None, input, '')
+        
         # 关闭浏览器上下文和浏览器实例
         await context.close()
         await browser.close()

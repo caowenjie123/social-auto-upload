@@ -9,7 +9,7 @@ from uploader.tk_uploader.tk_config import Tk_Locator
 from utils.base_social_media import set_init_script
 from utils.files_times import get_absolute_path
 from utils.log import tiktok_logger
-from conf import LOCAL_CHROME_HEADLESS
+from conf import LOCAL_CHROME_HEADLESS, TYPING_DELAY, MANUAL_PUBLISH, KEEP_BROWSER_OPEN
 
 
 async def cookie_auth(account_file):
@@ -180,6 +180,15 @@ class TiktokVideo(object):
         await context.storage_state(path=f"{self.account_file}")  # save cookie
         tiktok_logger.info('  [-] update cookie！')
         await asyncio.sleep(2)  # close delay for look the video status
+        
+        # Keep browser open if configured
+        if KEEP_BROWSER_OPEN:
+            tiktok_logger.info('\n' + '='*50)
+            tiktok_logger.info('[BROWSER OPEN] You can manually edit content in the browser')
+            tiktok_logger.info('Press Enter to close the browser when done...')
+            tiktok_logger.info('='*50)
+            await asyncio.get_event_loop().run_in_executor(None, input, '')
+        
         # close all
         await context.close()
         await browser.close()
@@ -198,8 +207,10 @@ class TiktokVideo(object):
         await page.keyboard.press("End")
 
         await page.wait_for_timeout(1000)  # 等待1秒
+        await asyncio.sleep(TYPING_DELAY)  # 填写前等待
 
         await page.keyboard.insert_text(self.title)
+        await asyncio.sleep(TYPING_DELAY)  # 输入标题后等待
         await page.wait_for_timeout(1000)  # 等待1秒
         await page.keyboard.press("End")
 
@@ -212,12 +223,20 @@ class TiktokVideo(object):
             await page.wait_for_timeout(1000)  # 等待1秒
             await page.keyboard.insert_text("#" + tag + " ")
             await page.keyboard.press("Space")
+            await asyncio.sleep(TYPING_DELAY)  # 每个话题后等待
             await page.wait_for_timeout(1000)  # 等待1秒
 
             await page.keyboard.press("Backspace")
             await page.keyboard.press("End")
 
     async def click_publish(self, page):
+        if MANUAL_PUBLISH:
+            tiktok_logger.info('\n' + '='*50)
+            tiktok_logger.info('[WAITING] Please check the content, then press Enter to confirm publishing...')
+            tiktok_logger.info('='*50)
+            await asyncio.get_event_loop().run_in_executor(None, input, '')
+            tiktok_logger.info('User confirmed, publishing...')
+        
         success_flag_div = '#\\:r9\\:'
         while True:
             try:
